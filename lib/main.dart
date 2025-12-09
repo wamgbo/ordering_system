@@ -90,24 +90,30 @@ class HomeContent extends StatelessWidget {
     );
   }
 Widget _menuItem(String imagePath,  VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(20),
-      child: Container(
-        decoration: BoxDecoration(//裝飾
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),//圓邊
-          border: Border.all(color: Colors.black, width: 3),//黑邊
-          boxShadow: const [
-            BoxShadow(color: Colors.black54, blurRadius: 15, offset: Offset(0, 8))//黑影
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(imagePath, width: 140, height: 140),
-            const SizedBox(height: 16),
-          ],
+      child: InkWell(
+        onTap: onTap,//tap要做的事情
+        splashColor: Colors.black26,     // 點擊漣漪顏色
+      highlightColor: Colors.black12,  // 長按高亮顏色
+        borderRadius: BorderRadius.circular(20),//原編
+        child: Container(
+          decoration: BoxDecoration(//裝飾
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),//圓邊
+            border: Border.all(color: Colors.black, width: 3),//黑邊
+            boxShadow: const [
+              BoxShadow(color: Colors.black54, blurRadius: 15, offset: Offset(0, 8))//黑影
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(imagePath, width: 140, height: 140),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
