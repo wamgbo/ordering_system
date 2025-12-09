@@ -9,6 +9,8 @@ class OrderPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('我要點餐')),
       body: SelectBar(),
+
+      body: SelectBar(),
     );
   }
 }
@@ -43,14 +45,31 @@ class _SelectBarState extends State<SelectBar> {
         //間隔
         const SizedBox(height: 20),
         //按鈕
-        ElevatedButton(
-          // onPressed: () => setState(() => _selected = index),
-          onPressed: () {
-            setState(() {
-              _selected = index;
-            });
-          },
-          child: Text(text),
+        SizedBox(
+          width: 120,
+          height: 50,
+          child: ElevatedButton(
+            //按鈕造型
+            style: ElevatedButton.styleFrom(
+              shadowColor: Colors.black,
+              elevation: 12,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10), // 數字越大越圓，30~40最美
+                side: const BorderSide(color: Colors.black, width: 2),
+              ),
+            ),
+            //按下要做的事情
+            onPressed: () => setState(() => _selected = index),
+            //按鈕上面的字
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
         ),
       ],
     );
