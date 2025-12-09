@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'pages/order_page.dart';
 void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
@@ -8,7 +8,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: OrderingPage(),
+      home: mainPage(),
     );
   }
 }
@@ -70,7 +70,8 @@ class HomeContent extends StatelessWidget {
               crossAxisSpacing: 30,
               children: [
                 _menuItem('assets/P1_1.png', () {
-                  // 點擊我要點餐
+                  //Navigator頁面挑轉總管
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const OrderPage()));
                 }),
                 _menuItem('assets/P2_1.png', () {
                   // 點擊點餐紀錄
@@ -113,12 +114,13 @@ Widget _menuItem(String imagePath,  VoidCallback onTap) {
   }
 }
 // 主頁面只負責組裝
-class OrderingPage extends StatelessWidget {
-  const OrderingPage({super.key});
+class mainPage extends StatelessWidget {
+  const mainPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.amberAccent,
       appBar: const FloatingIslandAppBar(),
       body: const HomeContent(),
     );
