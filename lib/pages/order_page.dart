@@ -9,9 +9,12 @@ class OrderPage extends StatefulWidget {
 
 class _OrderPageState extends State<OrderPage> {
   int _currentCategoryIndex = 0;
-  bool _showSummary = false; // 控制是否顯示結帳明細
+  bool _showSummary = false;
 
-  // 菜單資料
+  // 姓名與電話的控制器
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+
   final Map<int, List<Map<String, dynamic>>> _menuData = {
     0: [
       {"name": "豬肉總匯", "price": 65, "img": "assets/P1_1.png"},
@@ -30,10 +33,8 @@ class _OrderPageState extends State<OrderPage> {
     ],
   };
 
-  // 訂單狀態 {品項名稱: 數量}
   final Map<String, int> _orderList = {};
 
-  // 計算總金額
   int get _totalPrice {
     int total = 0;
     _orderList.forEach((name, count) {
@@ -47,17 +48,15 @@ class _OrderPageState extends State<OrderPage> {
     return total;
   }
 
-  // --- 新增：放大圖片的對話框 ---
+  // 圖片放大彈窗
   void _showImageDialog(String imgPath, String name) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: Colors.transparent, // 背景透明
-        insetPadding: const EdgeInsets.all(10),
+        backgroundColor: Colors.transparent,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 頂部關閉按鈕與標題
             Align(
               alignment: Alignment.topRight,
               child: IconButton(
@@ -65,26 +64,15 @@ class _OrderPageState extends State<OrderPage> {
                 onPressed: () => Navigator.pop(context),
               ),
             ),
-            // 使用 InteractiveViewer 讓使用者可以縮放圖片
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: InteractiveViewer(
-                child: Image.asset(
-                  imgPath,
-                  fit: BoxFit.contain,
-                  errorBuilder: (c, e, s) => Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.all(50),
-                    child: const Icon(Icons.broken_image, size: 100),
-                  ),
-                ),
+            InteractiveViewer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(imgPath, fit: BoxFit.contain,
+                  errorBuilder: (c, e, s) => Container(color: Colors.white, padding: const EdgeInsets.all(50), child: const Icon(Icons.broken_image, size: 100))),
               ),
             ),
             const SizedBox(height: 10),
-            Text(
-              name,
-              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-            ),
+            Text(name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -105,18 +93,18 @@ class _OrderPageState extends State<OrderPage> {
             Text("提示", style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
-        content: const Text(
-          "您好\n訂單已送出，\n餐點現在約10~15分鐘，請稍候，謝謝您！",
+        content: Text(
+          "${_nameController.text} 您好\n訂單已送出，\n餐點現在約10~15分鐘，請稍候，謝謝您！",
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 18, height: 1.5),
+          style: const TextStyle(fontSize: 18, height: 1.5),
         ),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
             onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
+              Navigator.pop(context); // 關閉彈窗
+              Navigator.pop(context); // 返回主畫面
             },
             child: const Text("確認"),
           ),
@@ -136,7 +124,40 @@ class _OrderPageState extends State<OrderPage> {
       ),
       body: Column(
         children: [
-          const SizedBox(height: 15),
+          // --- 頂部輸入欄位：姓名與電話平行 ---
+          Container(
+            padding: const EdgeInsets.all(15),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: '輸入姓名',
+                      prefixIcon: Icon(Icons.person, size: 20),
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: '電話號碼',
+                      prefixIcon: Icon(Icons.phone, size: 20),
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
           _buildSelectBar(),
           
           Expanded(
@@ -149,15 +170,13 @@ class _OrderPageState extends State<OrderPage> {
               },
             ),
           ),
-
-          // 底部控制區域
           _buildBottomPanel(),
         ],
       ),
     );
   }
 
-  // 分類選擇
+  // 分類選擇 Bar
   Widget _buildSelectBar() {
     final categories = ["蛋餅", "麵食", "飯類"];
     return Row(
@@ -174,7 +193,7 @@ class _OrderPageState extends State<OrderPage> {
                 _currentCategoryIndex = index;
                 _showSummary = false; 
               }),
-              child: Text(categories[index]),
+              child: Text(categories[index], style: const TextStyle(color: Colors.black)),
             ),
           ],
         );
@@ -182,7 +201,7 @@ class _OrderPageState extends State<OrderPage> {
     );
   }
 
-  // 單行餐點卡片
+  // 餐點項目卡片
   Widget _buildOrderItemCard(Map<String, dynamic> item) {
     String name = item['name'];
     int count = _orderList[name] ?? 0;
@@ -196,19 +215,14 @@ class _OrderPageState extends State<OrderPage> {
             value: count > 0, 
             onChanged: (v) => setState(() => v! ? _orderList[name] = 1 : _orderList.remove(name))
           ),
-          Text("$name[${item['price']}]"),
+          Text("$name[${item['price']}]", style: const TextStyle(fontSize: 15)),
           const Spacer(),
-          // --- 修改：增加 GestureDetector 點擊放大 ---
           GestureDetector(
             onTap: () => _showImageDialog(item['img'], name),
-            child: Hero( // 加上 Hero 動畫讓放大效果更順滑
+            child: Hero(
               tag: name,
-              child: Image.asset(
-                item['img'], 
-                width: 50, 
-                height: 50, 
-                errorBuilder: (c,e,s) => const Icon(Icons.fastfood)
-              ),
+              child: Image.asset(item['img'], width: 50, height: 50, 
+                errorBuilder: (c,e,s) => const Icon(Icons.fastfood, color: Colors.grey)),
             ),
           ),
           const SizedBox(width: 10),
@@ -267,10 +281,8 @@ class _OrderPageState extends State<OrderPage> {
           const Divider(color: Colors.black, thickness: 1.5),
           Align(
             alignment: Alignment.centerLeft,
-            child: Text(
-              "總金額： ${_showSummary ? _totalPrice : 0}", 
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
-            ),
+            child: Text("總金額： ${_showSummary ? _totalPrice : 0}", 
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           ),
           const Divider(color: Colors.black, thickness: 1.5),
 
@@ -281,7 +293,7 @@ class _OrderPageState extends State<OrderPage> {
               _btnItem(
                 "確定點餐", 
                 const Color(0xFFDCEDC8), 
-                _showSummary ? _showFinishDialog : null, 
+                (_showSummary && _nameController.text.isNotEmpty) ? _showFinishDialog : null, 
                 hasBorder: true
               ),
             ],
@@ -300,7 +312,10 @@ class _OrderPageState extends State<OrderPage> {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: color,
-            border: Border.all(color: hasBorder ? Colors.green : Colors.black, width: hasBorder ? 2 : 1),
+            border: Border.all(
+              color: hasBorder ? Colors.green : Colors.black, 
+              width: hasBorder ? 2 : 1
+            ),
           ),
           child: Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         ),
