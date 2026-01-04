@@ -50,17 +50,31 @@ class _HomeContentState extends State<HomeContent> {
   bool _isLoggedIn = false;
   String _userName = "";
 
-  // 實作：開啟點餐紀錄 (對應您的拼塊 Image 2 與 Image 6)
+// 實作：在 App 內部開啟瀏覽器瀏覽 Excel
   Future<void> _launchOrderSheet() async {
-    // 這是您指定的試算表網址
+    // 這是您的試算表網址
     final Uri url = Uri.parse('https://docs.google.com/spreadsheets/d/1HbxMsxEZxmKM-OJVsJHbPs-CyO4frGbP2kgNuvEjjJ4/edit?usp=sharing');
     
-    // 使用外部應用程式開啟，可避免內置瀏覽器因未登入 Google 而產生的報錯
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('無法開啟試算表網址')));
+    try {
+      // 使用 inAppWebView 模式，讓瀏覽器鑲嵌在 App 內部
+      final bool launched = await launchUrl(
+        url, 
+        mode: LaunchMode.inAppWebView, // 關鍵：內部開啟
+        webViewConfiguration: const WebViewConfiguration(
+          enableJavaScript: true,      // 啟用 JavaScript 以確保試算表渲染正常
+          enableDomStorage: true,      // 啟用 DOM 儲存，提升載入穩定性
+        ),
+      );
+
+      if (!launched) {
+        throw 'Could not launch $url';
+      }
+    } catch (e) {
+      debugPrint('開啟錯誤: $e');
+      // 如果內部開啟失敗，可作為保險改用外部應用程式開啟
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
-
   // 實作：模擬 Google 帳號登入 (解決您看到的 Image 3/4 報錯)
   Future<void> _handleMockLogin() async {
     showDialog(
