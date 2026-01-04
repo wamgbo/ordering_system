@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'pages/order_page.dart';
+import 'pages/order_page.dart'; // 確保您的專案中有此檔案
 
 void main() => runApp(const MyApp());
 
@@ -15,7 +17,9 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// 頂部導覽列：點餐系統APP
+// ==========================================
+// 1. 主頁面與頂部導覽列
+// ==========================================
 class FloatingIslandAppBar extends StatelessWidget implements PreferredSizeWidget {
   const FloatingIslandAppBar({super.key});
   @override
@@ -40,6 +44,21 @@ class FloatingIslandAppBar extends StatelessWidget implements PreferredSizeWidge
   Size get preferredSize => const Size.fromHeight(100);
 }
 
+class mainPage extends StatelessWidget {
+  const mainPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Colors.amberAccent,
+      appBar: FloatingIslandAppBar(),
+      body: HomeContent(),
+    );
+  }
+}
+
+// ==========================================
+// 2. 主內容區域：點擊「點餐紀錄」後觸發登入驗證
+// ==========================================
 class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
   @override
@@ -47,53 +66,77 @@ class HomeContent extends StatefulWidget {
 }
 
 class _HomeContentState extends State<HomeContent> {
-  bool _isLoggedIn = false;
-  String _userName = "";
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _adminPwdController = TextEditingController();
 
-// 實作：在 App 內部開啟瀏覽器瀏覽 Excel
-  Future<void> _launchOrderSheet() async {
-    // 這是您的試算表網址
-    final Uri url = Uri.parse('https://docs.google.com/spreadsheets/d/1HbxMsxEZxmKM-OJVsJHbPs-CyO4frGbP2kgNuvEjjJ4/edit?usp=sharing');
-    
-    try {
-      // 使用 inAppWebView 模式，讓瀏覽器鑲嵌在 App 內部
-      final bool launched = await launchUrl(
-        url, 
-        mode: LaunchMode.inAppWebView, // 關鍵：內部開啟
-        webViewConfiguration: const WebViewConfiguration(
-          enableJavaScript: true,      // 啟用 JavaScript 以確保試算表渲染正常
-          enableDomStorage: true,      // 啟用 DOM 儲存，提升載入穩定性
-        ),
-      );
-
-      if (!launched) {
-        throw 'Could not launch $url';
-      }
-    } catch (e) {
-      debugPrint('開啟錯誤: $e');
-      // 如果內部開啟失敗，可作為保險改用外部應用程式開啟
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    }
-  }
-  // 實作：模擬 Google 帳號登入 (解決您看到的 Image 3/4 報錯)
-  Future<void> _handleMockLogin() async {
+  // 彈出驗證視窗：要求輸入個人資訊或管理員密碼
+  void _showLoginDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator(color: Colors.amber)),
+      builder: (context) => AlertDialog(
+        title: const Text("查詢驗證", style: TextStyle(fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("客戶請輸入資訊查詢：", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: "姓名", border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: "電話號碼", border: OutlineInputBorder()),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 15),
+                child: Divider(thickness: 2),
+              ),
+              const Text("店家管理員登入：", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _adminPwdController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: "管理密碼 (123)", border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("取消")),
+          ElevatedButton(
+            onPressed: () {
+              // 優先判斷管理員登入
+              if (_adminPwdController.text == "123") {
+                _adminPwdController.clear();
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminStorePage()));
+              } 
+              // 其次判斷客戶端登入
+              else if (_nameController.text.isNotEmpty && _phoneController.text.isNotEmpty) {
+                String name = _nameController.text;
+                String phone = _phoneController.text;
+                _nameController.clear();
+                _phoneController.clear();
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => CustomerQueryPage(currentUserName: name, currentUserPhone: phone)
+                ));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("請輸入客戶資訊或管理密碼"), backgroundColor: Colors.red),
+                );
+              }
+            },
+            child: const Text("確認"),
+          ),
+        ],
+      ),
     );
-
-    // 模擬網路驗證延遲 1.5 秒
-    await Future.delayed(const Duration(milliseconds: 1500));
-    
-    Navigator.pop(context); // 關閉讀取動畫
-
-    setState(() {
-      _isLoggedIn = true;
-      _userName = "管理員用戶";
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("模擬 Google 帳號驗證成功！")));
   }
 
   @override
@@ -101,10 +144,9 @@ class _HomeContentState extends State<HomeContent> {
     return SafeArea(
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Text(_isLoggedIn ? '歡迎，$_userName' : '點餐系統', 
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+          const Padding(
+            padding: EdgeInsets.all(20),
+            child: Text('點餐功能選單', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
           ),
           Expanded(
             child: GridView.count(
@@ -114,33 +156,27 @@ class _HomeContentState extends State<HomeContent> {
               crossAxisSpacing: 30,
               children: [
                 _menuItem('assets/P1_1.png', () {
+                  // 原有的點餐功能跳轉
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const OrderPage()));
                 }),
-                _menuItem('assets/P4_1.png', () {
-                  _launchOrderSheet(); // 執行開啟試算表
-                }),
-                _menuItem('assets/P3_1.png', () {
-                  _showInfoDialog("設計團隊", "本 App 由 Flutter 實作模擬");
-                }),
-                _menuItem('assets/P2_1.png', () {
-                  // 點擊「關於系統」執行模擬登入，解決找不到帳號的報錯
-                  _showInfoDialog("關於系統", "本 App 由 Flutter 實作模擬");
-                }),
+                _menuItem('assets/P4_1.png', _showLoginDialog), // 點擊點餐紀錄，彈出登入對話框
+                _menuItem('assets/P3_1.png', () {}),
+                _menuItem('assets/P2_1.png', () {}),
               ],
             ),
           ),
+          // 底部 Firebase 查詢按鈕 (保留)
+          InkWell(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FirebaseLogicPage())),
+            child: Container(
+              width: double.infinity,
+              height: 60,
+              color: Colors.grey[400],
+              alignment: Alignment.center,
+              child: const Text("查詢FireBase雲端資料庫", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+          ),
         ],
-      ),
-    );
-  }
-
-  void _showInfoDialog(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("確定"))],
       ),
     );
   }
@@ -165,14 +201,115 @@ class _HomeContentState extends State<HomeContent> {
   }
 }
 
-class mainPage extends StatelessWidget {
-  const mainPage({super.key});
+// ==========================================
+// 3. 客戶端頁面 (根據輸入的姓名與電話篩選)
+// ==========================================
+class CustomerQueryPage extends StatelessWidget {
+  final String currentUserName;
+  final String currentUserPhone;
+  const CustomerQueryPage({super.key, required this.currentUserName, required this.currentUserPhone});
+
+  Future<List<String>> _fetchMyData() async {
+    const String url = "https://orderapp-e60fb-default-rtdb.asia-southeast1.firebasedatabase.app/orders.json";
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200 && response.body != 'null') {
+      Map<String, dynamic> data = json.decode(response.body);
+      return data.values
+          .where((v) => v.toString().contains(currentUserName) || v.toString().contains(currentUserPhone))
+          .map((v) => v.toString()).toList();
+    }
+    return ["查無您的相關資料"];
+  }
+
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Colors.amberAccent,
-      appBar: FloatingIslandAppBar(),
-      body: HomeContent(),
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(title: Text("$currentUserName 的訂單紀錄"), backgroundColor: Colors.amber),
+      body: FutureBuilder<List<String>>(
+        future: _fetchMyData(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          final list = snapshot.data ?? [];
+          return ListView.separated(
+            padding: const EdgeInsets.all(20),
+            itemCount: list.length,
+            separatorBuilder: (context, index) => const Divider(color: Colors.grey),
+            itemBuilder: (context, index) => Text(list[index], style: const TextStyle(color: Colors.white, fontSize: 16)),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 4. 店家端頁面 (顯示所有資料)
+// ==========================================
+class AdminStorePage extends StatelessWidget {
+  const AdminStorePage({super.key});
+
+  Future<List<String>> _fetchAll() async {
+    const String url = "https://orderapp-e60fb-default-rtdb.asia-southeast1.firebasedatabase.app/orders.json";
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200 && response.body != 'null') {
+      Map<String, dynamic> data = json.decode(response.body);
+      return data.values.map((v) => v.toString()).toList();
+    }
+    return [];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("店家端後台管理"), backgroundColor: Colors.amber),
+      body: FutureBuilder<List<String>>(
+        future: _fetchAll(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          final list = snapshot.data ?? [];
+          return Column(
+            children: [
+              Container(
+                width: double.infinity, color: Colors.amber, padding: const EdgeInsets.all(15),
+                child: Text("全系統總訂單筆數: ${list.length}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: list.length,
+                  itemBuilder: (context, index) => ListTile(
+                    title: Text(list[index]),
+                    subtitle: const Text("---------------------------------"),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 5. Firebase 邏輯展示頁面
+// ==========================================
+class FirebaseLogicPage extends StatelessWidget {
+  const FirebaseLogicPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(width: double.infinity, color: const Color(0xFFFFC107), padding: const EdgeInsets.all(15),
+              child: const Text("查詢FireBase雲端資料庫", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold))),
+            Container(width: double.infinity, color: Colors.black, padding: const EdgeInsets.all(12),
+              child: const Text("Firebase Logic Page\nStatus: Online", style: TextStyle(color: Colors.white))),
+            const Expanded(child: Center(child: Text("這裡是 Firebase 原始資料對應頁面"))),
+          ],
+        ),
+      ),
     );
   }
 }
