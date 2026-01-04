@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http; // 請確保已在 pubspec.yaml 加入 http 套件
 
 class OrderPage extends StatefulWidget {
   const OrderPage({super.key});
@@ -11,7 +12,6 @@ class _OrderPageState extends State<OrderPage> {
   int _currentCategoryIndex = 0;
   bool _showSummary = false;
 
-  // 姓名與電話的控制器
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
 
@@ -48,7 +48,73 @@ class _OrderPageState extends State<OrderPage> {
     return total;
   }
 
-  // 圖片放大彈窗
+  // --- 核心功能：上傳到 Google 表單 ---
+  Future<void> _submitToGoogleForm() async {
+    // 您提供的表單網址
+    const String formId = "13YN30kcFdPIqvjJg0be2d2lCiBYkCaORmHScvktCVUc";
+    final url = Uri.parse("https://docs.google.com/forms/d/$formId/formResponse");
+
+    // 將訂單轉為字串格式
+    String itemNames = _orderList.keys.join(", ");
+    String itemCounts = _orderList.values.join(", ");
+
+    try {
+      // 對應您拼塊圖中的 entry ID
+      await http.post(
+        url,
+        body: {
+          "entry.2062332167": _nameController.text,      // 姓名
+          "entry.647612156": itemNames,                  // 點餐清單
+          "entry.598437499": itemCounts,                 // 數量
+          "entry.2020585095": _totalPrice.toString(),    // 總金額
+          "entry.137647088": _phoneController.text,      // 電話
+          "submit": "Submit",
+        },
+      );
+    } catch (e) {
+      debugPrint("上傳失敗: $e");
+    }
+  }
+
+  void _showFinishDialog() async {
+    // 點擊確定後先執行上傳
+    await _submitToGoogleForm();
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Column(
+          children: [
+            Icon(Icons.report_problem_outlined, color: Colors.orange, size: 70),
+            SizedBox(height: 10),
+            Text("提示", style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          "${_nameController.text} 您好\n訂單已送出並同步至後台，\n餐點製作約 10~15 分鐘，請稍候！",
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 18, height: 1.5),
+        ),
+        actions: [
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pop(context);
+              },
+              child: const Text("確認"),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 圖片放大功能
   void _showImageDialog(String imgPath, String name) {
     showDialog(
       context: context,
@@ -59,10 +125,7 @@ class _OrderPageState extends State<OrderPage> {
           children: [
             Align(
               alignment: Alignment.topRight,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                onPressed: () => Navigator.pop(context),
-              ),
+              child: IconButton(icon: const Icon(Icons.close, color: Colors.white, size: 30), onPressed: () => Navigator.pop(context)),
             ),
             InteractiveViewer(
               child: ClipRRect(
@@ -79,40 +142,6 @@ class _OrderPageState extends State<OrderPage> {
     );
   }
 
-  // 點餐完成彈窗
-  void _showFinishDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Column(
-          children: [
-            Icon(Icons.report_problem_outlined, color: Colors.orange, size: 70),
-            SizedBox(height: 10),
-            Text("提示", style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Text(
-          "${_nameController.text} 您好\n訂單已送出，\n餐點現在約10~15分鐘，請稍候，謝謝您！",
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 18, height: 1.5),
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-            onPressed: () {
-              Navigator.pop(context); // 關閉彈窗
-              Navigator.pop(context); // 返回主畫面
-            },
-            child: const Text("確認"),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -124,42 +153,20 @@ class _OrderPageState extends State<OrderPage> {
       ),
       body: Column(
         children: [
-          // --- 頂部輸入欄位：姓名與電話平行 ---
+          // 頂部輸入姓名與電話
           Container(
             padding: const EdgeInsets.all(15),
             color: Colors.white,
             child: Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: '輸入姓名',
-                      prefixIcon: Icon(Icons.person, size: 20),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                ),
+                Expanded(child: TextField(controller: _nameController, decoration: const InputDecoration(labelText: '姓名', prefixIcon: Icon(Icons.person), border: OutlineInputBorder(), isDense: true))),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: '電話號碼',
-                      prefixIcon: Icon(Icons.phone, size: 20),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                ),
+                Expanded(child: TextField(controller: _phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: '電話', prefixIcon: Icon(Icons.phone), border: OutlineInputBorder(), isDense: true))),
               ],
             ),
           ),
           const SizedBox(height: 10),
           _buildSelectBar(),
-          
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(10),
@@ -176,7 +183,6 @@ class _OrderPageState extends State<OrderPage> {
     );
   }
 
-  // 分類選擇 Bar
   Widget _buildSelectBar() {
     final categories = ["蛋餅", "麵食", "飯類"];
     return Row(
@@ -189,10 +195,7 @@ class _OrderPageState extends State<OrderPage> {
             const SizedBox(height: 8),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: isSelected ? Colors.amber : Colors.white),
-              onPressed: () => setState(() {
-                _currentCategoryIndex = index;
-                _showSummary = false; 
-              }),
+              onPressed: () => setState(() { _currentCategoryIndex = index; _showSummary = false; }),
               child: Text(categories[index], style: const TextStyle(color: Colors.black)),
             ),
           ],
@@ -201,7 +204,6 @@ class _OrderPageState extends State<OrderPage> {
     );
   }
 
-  // 餐點項目卡片
   Widget _buildOrderItemCard(Map<String, dynamic> item) {
     String name = item['name'];
     int count = _orderList[name] ?? 0;
@@ -211,81 +213,41 @@ class _OrderPageState extends State<OrderPage> {
       color: Colors.white,
       child: Row(
         children: [
-          Checkbox(
-            value: count > 0, 
-            onChanged: (v) => setState(() => v! ? _orderList[name] = 1 : _orderList.remove(name))
-          ),
-          Text("$name[${item['price']}]", style: const TextStyle(fontSize: 15)),
+          Checkbox(value: count > 0, onChanged: (v) => setState(() => v! ? _orderList[name] = 1 : _orderList.remove(name))),
+          Text("$name[${item['price']}]"),
           const Spacer(),
-          GestureDetector(
-            onTap: () => _showImageDialog(item['img'], name),
-            child: Hero(
-              tag: name,
-              child: Image.asset(item['img'], width: 50, height: 50, 
-                errorBuilder: (c,e,s) => const Icon(Icons.fastfood, color: Colors.grey)),
-            ),
-          ),
+          GestureDetector(onTap: () => _showImageDialog(item['img'], name), child: Hero(tag: name, child: Image.asset(item['img'], width: 50, height: 50, errorBuilder: (c,e,s) => const Icon(Icons.fastfood)))),
           const SizedBox(width: 10),
           DropdownButton<int>(
             value: count,
             items: List.generate(11, (i) => DropdownMenuItem(value: i, child: Text("$i"))),
-            onChanged: (v) => setState(() {
-              _showSummary = false; 
-              v == 0 ? _orderList.remove(name) : _orderList[name] = v!;
-            }),
+            onChanged: (v) => setState(() { _showSummary = false; v == 0 ? _orderList.remove(name) : _orderList[name] = v!; }),
           ),
         ],
       ),
     );
   }
 
-  // 底部按鈕面板
   Widget _buildBottomPanel() {
     return Container(
       padding: const EdgeInsets.fromLTRB(15, 10, 15, 20),
-      decoration: const BoxDecoration(
-        color: Colors.white, 
-        border: Border(top: BorderSide(color: Colors.black, width: 2))
-      ),
+      decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.black, width: 2))),
       child: Column(
         children: [
           Row(
             children: [
-              _btnItem("取消", Colors.grey[300]!, () => setState(() {
-                _orderList.clear();
-                _showSummary = false;
-              })),
+              _btnItem("取消", Colors.grey[300]!, () => setState(() { _orderList.clear(); _showSummary = false; })),
               const SizedBox(width: 10),
-              _btnItem("結帳", Colors.grey[300]!, () {
-                if (_orderList.isNotEmpty) setState(() => _showSummary = true);
-              }),
+              _btnItem("結帳", Colors.grey[300]!, () { if (_orderList.isNotEmpty) setState(() => _showSummary = true); }),
             ],
           ),
-          
           if (_showSummary) ...[
             const Divider(color: Colors.black),
-            Column(
-              children: _orderList.entries.map((e) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text("• ${e.key}", style: const TextStyle(fontSize: 16)),
-                    Text("${e.value} 份", style: const TextStyle(fontSize: 16)),
-                  ],
-                ),
-              )).toList(),
-            ),
+            ..._orderList.entries.map((e) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("• ${e.key}"), Text("${e.value} 份")])),
           ],
-
           const Divider(color: Colors.black, thickness: 1.5),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text("總金額： ${_showSummary ? _totalPrice : 0}", 
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          ),
+          Align(alignment: Alignment.centerLeft, child: Text("總金額： ${_showSummary ? _totalPrice : 0}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
           const Divider(color: Colors.black, thickness: 1.5),
-
           Row(
             children: [
               _btnItem("回主畫面", Colors.grey[300]!, () => Navigator.pop(context)),
@@ -293,7 +255,7 @@ class _OrderPageState extends State<OrderPage> {
               _btnItem(
                 "確定點餐", 
                 const Color(0xFFDCEDC8), 
-                (_showSummary && _nameController.text.isNotEmpty) ? _showFinishDialog : null, 
+                (_showSummary && _nameController.text.isNotEmpty && _phoneController.text.isNotEmpty) ? _showFinishDialog : null, 
                 hasBorder: true
               ),
             ],
@@ -310,13 +272,7 @@ class _OrderPageState extends State<OrderPage> {
         child: Container(
           height: 45,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: color,
-            border: Border.all(
-              color: hasBorder ? Colors.green : Colors.black, 
-              width: hasBorder ? 2 : 1
-            ),
-          ),
+          decoration: BoxDecoration(color: color, border: Border.all(color: hasBorder ? Colors.green : Colors.black, width: hasBorder ? 2 : 1)),
           child: Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         ),
       ),
