@@ -1,5 +1,6 @@
+import 'dart:convert'; // [新增] 用於將資料轉為 JSON 格式
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http; // 請確保已在 pubspec.yaml 加入 http 套件
+import 'package:http/http.dart' as http;
 
 class OrderPage extends StatefulWidget {
   const OrderPage({super.key});
@@ -48,37 +49,82 @@ class _OrderPageState extends State<OrderPage> {
     return total;
   }
 
-  // --- 核心功能：上傳到 Google 表單 ---
+  // --- 功能 1：上傳到 Google 表單 ---
   Future<void> _submitToGoogleForm() async {
-    // 您提供的表單網址
     const String formId = "13YN30kcFdPIqvjJg0be2d2lCiBYkCaORmHScvktCVUc";
     final url = Uri.parse("https://docs.google.com/forms/d/$formId/formResponse");
 
-    // 將訂單轉為字串格式
     String itemNames = _orderList.keys.join(", ");
     String itemCounts = _orderList.values.join(", ");
 
     try {
-      // 對應您拼塊圖中的 entry ID
       await http.post(
         url,
         body: {
-          "entry.2062332167": _nameController.text,      // 姓名
-          "entry.647612156": itemNames,                  // 點餐清單
-          "entry.598437499": itemCounts,                 // 數量
-          "entry.2020585095": _totalPrice.toString(),    // 總金額
-          "entry.137647088": _phoneController.text,      // 電話
+          "entry.2062332167": _nameController.text,
+          "entry.647612156": itemNames,
+          "entry.598437499": itemCounts,
+          "entry.2020585095": _totalPrice.toString(),
+          "entry.137647088": _phoneController.text,
           "submit": "Submit",
         },
       );
+      debugPrint("Google 表單上傳成功");
     } catch (e) {
-      debugPrint("上傳失敗: $e");
+      debugPrint("Google 表單上傳失敗: $e");
+    }
+  }
+
+  // --- [新增] 功能 2：上傳到 Firebase Realtime Database ---
+  Future<void> _submitToFirebase() async {
+    // 你的 Firebase 資料庫網址
+    // 注意：REST API 需要在網址後方加上 "/節點名稱.json"
+    // 這裡我們建立一個 "orders" 節點來存放每筆訂單
+    const String firebaseUrl = "https://orderapp-e60fb-default-rtdb.asia-southeast1.firebasedatabase.app/orders.json";
+    final url = Uri.parse(firebaseUrl);
+
+    try {
+      // 準備要傳送的資料 (JSON 格式)
+      final Map<String, dynamic> orderData = {
+        "customerName": _nameController.text,
+        "customerPhone": _phoneController.text,
+        "totalPrice": _totalPrice,
+        "items": _orderList, // 直接傳送 Map 結構 {餐點名: 數量}
+        "orderTime": DateTime.now().toIso8601String(), // 紀錄下單時間
+      };
+
+      // 使用 POST 方法 (Firebase 會自動產生唯一的 ID)
+      final response = await http.post(
+        url,
+        body: jsonEncode(orderData), // 必須使用 jsonEncode 轉成字串
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint("Firebase 上傳成功: ${response.body}");
+      } else {
+        debugPrint("Firebase 上傳失敗: ${response.statusCode}");
+      }
+    } catch (e) {
+      debugPrint("Firebase 連線錯誤: $e");
     }
   }
 
   void _showFinishDialog() async {
-    // 點擊確定後先執行上傳
-    await _submitToGoogleForm();
+    // 顯示 Loading 指示器 (選用，避免使用者重複點擊)
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // 同時執行 Google 表單與 Firebase 上傳 (並行處理以節省時間)
+    await Future.wait([
+      _submitToGoogleForm(),
+      _submitToFirebase(),
+    ]);
+
+    // 關閉 Loading
+    if (mounted) Navigator.pop(context);
 
     if (!mounted) return;
     showDialog(
@@ -88,9 +134,9 @@ class _OrderPageState extends State<OrderPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: const Column(
           children: [
-            Icon(Icons.report_problem_outlined, color: Colors.orange, size: 70),
+            Icon(Icons.check_circle_outline, color: Colors.green, size: 70), // 改成勾勾比較符合成功情境
             SizedBox(height: 10),
-            Text("提示", style: TextStyle(fontWeight: FontWeight.bold)),
+            Text("訂購成功", style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         content: Text(
@@ -103,8 +149,8 @@ class _OrderPageState extends State<OrderPage> {
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
               onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
+                Navigator.pop(context); // 關閉 Dialog
+                Navigator.pop(context); // 回到上一頁
               },
               child: const Text("確認"),
             ),
