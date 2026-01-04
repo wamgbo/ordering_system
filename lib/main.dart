@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
-import 'pages/order_page.dart'; // 確保您的專案中有此檔案
+import 'pages/order_page.dart'; // 確保路徑正確
+// 引入您剛建立的兩個檔案
+import 'customer_query_page.dart'; 
+import 'admin_store_page.dart';
 
 void main() => runApp(const MyApp());
 
@@ -57,7 +57,7 @@ class mainPage extends StatelessWidget {
 }
 
 // ==========================================
-// 2. 主內容區域：點擊「點餐紀錄」後觸發登入驗證
+// 2. 主內容區域：整合跳轉邏輯
 // ==========================================
 class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
@@ -70,7 +70,6 @@ class _HomeContentState extends State<HomeContent> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _adminPwdController = TextEditingController();
 
-  // 彈出驗證視窗：要求輸入個人資訊或管理員密碼
   void _showLoginDialog() {
     showDialog(
       context: context,
@@ -110,19 +109,19 @@ class _HomeContentState extends State<HomeContent> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("取消")),
           ElevatedButton(
             onPressed: () {
-              // 優先判斷管理員登入
               if (_adminPwdController.text == "123") {
                 _adminPwdController.clear();
                 Navigator.pop(context);
+                // 跳轉至獨立的店家管理頁面
                 Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminStorePage()));
               } 
-              // 其次判斷客戶端登入
               else if (_nameController.text.isNotEmpty && _phoneController.text.isNotEmpty) {
                 String name = _nameController.text;
                 String phone = _phoneController.text;
                 _nameController.clear();
                 _phoneController.clear();
                 Navigator.pop(context);
+                // 跳轉至獨立的客戶查詢頁面
                 Navigator.push(context, MaterialPageRoute(
                   builder: (context) => CustomerQueryPage(currentUserName: name, currentUserPhone: phone)
                 ));
@@ -156,24 +155,12 @@ class _HomeContentState extends State<HomeContent> {
               crossAxisSpacing: 30,
               children: [
                 _menuItem('assets/P1_1.png', () {
-                  // 原有的點餐功能跳轉
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const OrderPage()));
                 }),
-                _menuItem('assets/P4_1.png', _showLoginDialog), // 點擊點餐紀錄，彈出登入對話框
+                _menuItem('assets/P4_1.png', _showLoginDialog),
                 _menuItem('assets/P3_1.png', () {}),
                 _menuItem('assets/P2_1.png', () {}),
               ],
-            ),
-          ),
-          // 底部 Firebase 查詢按鈕 (保留)
-          InkWell(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FirebaseLogicPage())),
-            child: Container(
-              width: double.infinity,
-              height: 60,
-              color: Colors.grey[400],
-              alignment: Alignment.center,
-              child: const Text("查詢FireBase雲端資料庫", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -195,119 +182,6 @@ class _HomeContentState extends State<HomeContent> {
             boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 15, offset: Offset(0, 8))],
           ),
           child: Center(child: Padding(padding: const EdgeInsets.all(15), child: Image.asset(imagePath))),
-        ),
-      ),
-    );
-  }
-}
-
-// ==========================================
-// 3. 客戶端頁面 (根據輸入的姓名與電話篩選)
-// ==========================================
-class CustomerQueryPage extends StatelessWidget {
-  final String currentUserName;
-  final String currentUserPhone;
-  const CustomerQueryPage({super.key, required this.currentUserName, required this.currentUserPhone});
-
-  Future<List<String>> _fetchMyData() async {
-    const String url = "https://orderapp-e60fb-default-rtdb.asia-southeast1.firebasedatabase.app/orders.json";
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200 && response.body != 'null') {
-      Map<String, dynamic> data = json.decode(response.body);
-      return data.values
-          .where((v) => v.toString().contains(currentUserName) || v.toString().contains(currentUserPhone))
-          .map((v) => v.toString()).toList();
-    }
-    return ["查無您的相關資料"];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(title: Text("$currentUserName 的訂單紀錄"), backgroundColor: Colors.amber),
-      body: FutureBuilder<List<String>>(
-        future: _fetchMyData(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          final list = snapshot.data ?? [];
-          return ListView.separated(
-            padding: const EdgeInsets.all(20),
-            itemCount: list.length,
-            separatorBuilder: (context, index) => const Divider(color: Colors.grey),
-            itemBuilder: (context, index) => Text(list[index], style: const TextStyle(color: Colors.white, fontSize: 16)),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ==========================================
-// 4. 店家端頁面 (顯示所有資料)
-// ==========================================
-class AdminStorePage extends StatelessWidget {
-  const AdminStorePage({super.key});
-
-  Future<List<String>> _fetchAll() async {
-    const String url = "https://orderapp-e60fb-default-rtdb.asia-southeast1.firebasedatabase.app/orders.json";
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200 && response.body != 'null') {
-      Map<String, dynamic> data = json.decode(response.body);
-      return data.values.map((v) => v.toString()).toList();
-    }
-    return [];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("店家端後台管理"), backgroundColor: Colors.amber),
-      body: FutureBuilder<List<String>>(
-        future: _fetchAll(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          final list = snapshot.data ?? [];
-          return Column(
-            children: [
-              Container(
-                width: double.infinity, color: Colors.amber, padding: const EdgeInsets.all(15),
-                child: Text("全系統總訂單筆數: ${list.length}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: list.length,
-                  itemBuilder: (context, index) => ListTile(
-                    title: Text(list[index]),
-                    subtitle: const Text("---------------------------------"),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ==========================================
-// 5. Firebase 邏輯展示頁面
-// ==========================================
-class FirebaseLogicPage extends StatelessWidget {
-  const FirebaseLogicPage({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(width: double.infinity, color: const Color(0xFFFFC107), padding: const EdgeInsets.all(15),
-              child: const Text("查詢FireBase雲端資料庫", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold))),
-            Container(width: double.infinity, color: Colors.black, padding: const EdgeInsets.all(12),
-              child: const Text("Firebase Logic Page\nStatus: Online", style: TextStyle(color: Colors.white))),
-            const Expanded(child: Center(child: Text("這裡是 Firebase 原始資料對應頁面"))),
-          ],
         ),
       ),
     );
