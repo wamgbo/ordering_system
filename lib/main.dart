@@ -171,17 +171,17 @@ class _HomeContentState extends State<HomeContent> {
   Widget _menuItem(String imagePath, VoidCallback onTap) {
     return Material(
       color: Colors.transparent,
-      child: InkWell(
+      child: InkWell(//InkWell是一個 Flutter (及 Dart) UI 元件，它允許你在任何 Widget 上添加可點擊的功能
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),//圓角
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.black, width: 3),
+            border: Border.all(color: Colors.black, width: 3),//黑邊
             boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 15, offset: Offset(0, 8))],
           ),
-          child: Center(child: Padding(padding: const EdgeInsets.all(15), child: Image.asset(imagePath))),
+          child: Center(child: Padding(padding: const EdgeInsets.all(15), child: Image.asset(imagePath))),//edgeInsets 與邊邊距離
         ),
       ),
     );

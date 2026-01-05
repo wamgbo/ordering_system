@@ -1,7 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'sqlite_helper.dart'; // 引入剛寫的 Helper
+import 'sqlite_helper.dart'; // 確保你有這個檔案
 
 class AdminStorePage extends StatefulWidget {
   const AdminStorePage({super.key});
@@ -14,6 +15,7 @@ class _AdminStorePageState extends State<AdminStorePage> {
   bool isTodayOnly = true;
   List<Map<String, dynamic>> orders = [];
   bool isLoading = true;
+  String dataSource = "正在初始化...";
 
   @override
   void initState() {
@@ -21,36 +23,38 @@ class _AdminStorePageState extends State<AdminStorePage> {
     _loadAndSyncData();
   }
 
-  // 核心邏輯：先載入本地緩存，再嘗試同步 Firebase
+  // 核心：先讀 SQLite，後同步 Firebase
   Future<void> _loadAndSyncData() async {
-    // 1. 先顯示本地現有的 SQLite 資料
+    setState(() => isLoading = true);
+
+    // 1. 從 SQLite 讀取
     final localData = await SqliteHelper.getLocalOrders();
     setState(() {
       orders = localData;
+      dataSource = "來源: SQLite 本地快取";
       isLoading = false;
     });
 
-    // 2. 嘗試從 Firebase 同步最新資料
+    // 2. 嘗試同步雲端
     try {
       const String url = "https://orderapp-e60fb-default-rtdb.asia-southeast1.firebasedatabase.app/orders.json";
       final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200 && response.body != 'null') {
         Map<String, dynamic> data = json.decode(response.body);
-        
-        // 逐筆存入 SQLite
         for (var key in data.keys) {
           await SqliteHelper.syncOrder(key, Map<String, dynamic>.from(data[key]));
         }
-
-        // 3. 同步完畢，重新讀取本地資料更新 UI
+        
+        // 同步完重新讀取
         final updatedData = await SqliteHelper.getLocalOrders();
         setState(() {
           orders = updatedData;
+          dataSource = "來源: SQLite (已與雲端同步)";
         });
       }
     } catch (e) {
-      debugPrint("網路同步失敗，目前顯示離線資料: $e");
+      setState(() => dataSource = "來源: SQLite (離線模式)");
     }
   }
 
@@ -66,13 +70,28 @@ class _AdminStorePageState extends State<AdminStorePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("店家後台 (SQLite 同步版)"),
+        title: const Text("店家管理後台"),
         backgroundColor: Colors.amber,
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _loadAndSyncData)],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(30),
+          child: Container(
+            color: Colors.blueGrey[800],
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              dataSource,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadAndSyncData),
+        ],
       ),
       body: Column(
         children: [
-          _buildTabs(),
+          _buildToggleButtons(),
           Expanded(
             child: isLoading 
               ? const Center(child: CircularProgressIndicator())
@@ -86,13 +105,25 @@ class _AdminStorePageState extends State<AdminStorePage> {
     );
   }
 
-  Widget _buildTabs() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        TextButton(onPressed: () => setState(() => isTodayOnly = true), child: Text("今日", style: TextStyle(color: isTodayOnly ? Colors.blue : Colors.grey))),
-        TextButton(onPressed: () => setState(() => isTodayOnly = false), child: Text("全部", style: TextStyle(color: !isTodayOnly ? Colors.blue : Colors.grey))),
-      ],
+  Widget _buildToggleButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          FilterChip(
+            label: const Text("今日訂單"),
+            selected: isTodayOnly,
+            onSelected: (v) => setState(() => isTodayOnly = true),
+          ),
+          const SizedBox(width: 10),
+          FilterChip(
+            label: const Text("全部紀錄"),
+            selected: !isTodayOnly,
+            onSelected: (v) => setState(() => isTodayOnly = false),
+          ),
+        ],
+      ),
     );
   }
 
@@ -101,19 +132,36 @@ class _AdminStorePageState extends State<AdminStorePage> {
     int finalPrice = total >= 100 ? (total * 0.9).round() : total;
 
     return Card(
-      margin: const EdgeInsets.all(10),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("客戶: ${order['customerName']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text("時間: ${order['orderTime']}"),
-            Text("內容: ${order['items']}"),
-            const Divider(),
-            Text("總計: $total / 優惠: $finalPrice", style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-          ],
-        ),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(15),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("客戶: ${order['customerName']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text("時間: ${order['orderTime'].toString().substring(0, 16)}"),
+                const Divider(),
+                Text("餐點: ${order['items']}"),
+                const SizedBox(height: 10),
+                Text("總金額: $total / 優惠價: $finalPrice", 
+                  style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+          ),
+          // 右下角 SQLite 標誌
+          const Positioned(
+            bottom: 8,
+            right: 8,
+            child: Row(
+              children: [
+                Text("SQLITE ", style: TextStyle(fontSize: 9, color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+                Icon(Icons.storage, size: 14, color: Colors.blueGrey),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
