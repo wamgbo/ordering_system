@@ -22,11 +22,9 @@ class _CustomerQueryPageState extends State<CustomerQueryPage> {
   }
 
   Future<void> _syncAndLoad() async {
-    // 1. 先讀本地
     final local = await SqliteHelper.getLocalOrders();
     _filterAndSet(local);
 
-    // 2. 同步雲端
     try {
       const String url = "https://orderapp-e60fb-default-rtdb.asia-southeast1.firebasedatabase.app/orders.json";
       final response = await http.get(Uri.parse(url));
@@ -39,7 +37,7 @@ class _CustomerQueryPageState extends State<CustomerQueryPage> {
         _filterAndSet(updated);
       }
     } catch (e) {
-      print("離線模式");
+      debugPrint("離線模式");
     }
   }
 
@@ -55,18 +53,30 @@ class _CustomerQueryPageState extends State<CustomerQueryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("我的點餐快取"), backgroundColor: Colors.amber),
-      body: ListView.builder(
-        itemCount: myOrders.length,
-        itemBuilder: (context, index) {
-          final o = myOrders[index];
-          return ListTile(
-            title: Text(o['orderTime']),
-            subtitle: Text("金額: ${o['totalPrice']} 元"),
-            trailing: const Icon(Icons.cloud_done, color: Colors.green),
-          );
-        },
-      ),
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(title: const Text("我的個人訂單紀錄"), backgroundColor: Colors.amber),
+      body: myOrders.isEmpty 
+        ? const Center(child: Text("尚無訂單紀錄"))
+        : ListView.builder(
+            itemCount: myOrders.length,
+            itemBuilder: (context, index) {
+              final o = myOrders[index];
+              int total = o['totalPrice'] ?? 0;
+              // 統一優惠邏輯：滿百九折
+              int finalPrice = total >= 100 ? (total * 0.9).round() : total;
+
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                child: ListTile(
+                  leading: const Icon(Icons.receipt_long, color: Colors.amber),
+                  title: Text("${o['orderTime']}"),
+                  subtitle: Text("餐點: ${o['items']}\n應付金額: \$$finalPrice (原價: \$$total)"),
+                  isThreeLine: true,
+                  trailing: const Icon(Icons.cloud_done, color: Colors.green),
+                ),
+              );
+            },
+          ),
     );
   }
 }
