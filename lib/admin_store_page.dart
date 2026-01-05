@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'sqlite_helper.dart'; // 引入剛寫的 Helper
 
 class AdminStorePage extends StatefulWidget {
   const AdminStorePage({super.key});
@@ -11,93 +12,108 @@ class AdminStorePage extends StatefulWidget {
 
 class _AdminStorePageState extends State<AdminStorePage> {
   bool isTodayOnly = true;
+  List<Map<String, dynamic>> orders = [];
+  bool isLoading = true;
 
-  Future<List<String>> _fetchAll() async {
-    const String url = "https://orderapp-e60fb-default-rtdb.asia-southeast1.firebasedatabase.app/orders.json";
-    final response = await http.get(Uri.parse(url));
+  @override
+  void initState() {
+    super.initState();
+    _loadAndSyncData();
+  }
 
-    if (response.statusCode == 200 && response.body != 'null') {
-      Map<String, dynamic> data = json.decode(response.body);
-      // 關鍵：對應 Firebase 的 orderTime 格式 (例如 2026-01-05)
-      String todayStr = DateTime.now().toString().split(' ')[0];
+  // 核心邏輯：先載入本地緩存，再嘗試同步 Firebase
+  Future<void> _loadAndSyncData() async {
+    // 1. 先顯示本地現有的 SQLite 資料
+    final localData = await SqliteHelper.getLocalOrders();
+    setState(() {
+      orders = localData;
+      isLoading = false;
+    });
 
-      return data.values.where((v) {
-        if (isTodayOnly) return v.toString().contains(todayStr);
-        return true;
-      }).map((v) => v.toString()).toList();
+    // 2. 嘗試從 Firebase 同步最新資料
+    try {
+      const String url = "https://orderapp-e60fb-default-rtdb.asia-southeast1.firebasedatabase.app/orders.json";
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200 && response.body != 'null') {
+        Map<String, dynamic> data = json.decode(response.body);
+        
+        // 逐筆存入 SQLite
+        for (var key in data.keys) {
+          await SqliteHelper.syncOrder(key, Map<String, dynamic>.from(data[key]));
+        }
+
+        // 3. 同步完畢，重新讀取本地資料更新 UI
+        final updatedData = await SqliteHelper.getLocalOrders();
+        setState(() {
+          orders = updatedData;
+        });
+      }
+    } catch (e) {
+      debugPrint("網路同步失敗，目前顯示離線資料: $e");
     }
-    return [];
+  }
+
+  List<Map<String, dynamic>> get filteredOrders {
+    String todayStr = DateTime.now().toString().split(' ')[0];
+    if (isTodayOnly) {
+      return orders.where((o) => o['orderTime'].toString().startsWith(todayStr)).toList();
+    }
+    return orders;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("店家端"),
+        title: const Text("店家後台 (SQLite 同步版)"),
         backgroundColor: Colors.amber,
-        actions: [
-          TextButton.icon(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.logout, color: Colors.black),
-            label: const Text("退出", style: TextStyle(color: Colors.black)),
-          )
-        ],
+        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _loadAndSyncData)],
       ),
       body: Column(
         children: [
-          // 頂部切換 Tab
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: const BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)]),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _customTab("今日點餐", isTodayOnly, () => setState(() => isTodayOnly = true)),
-                _customTab("點餐紀錄", !isTodayOnly, () => setState(() => isTodayOnly = false)),
-              ],
-            ),
-          ),
+          _buildTabs(),
           Expanded(
-            child: FutureBuilder<List<String>>(
-              future: _fetchAll(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                final list = snapshot.data ?? [];
-                return Column(
-                  children: [
-                    Container(
-                      width: double.infinity, padding: const EdgeInsets.all(10), color: Colors.amber[50],
-                      child: Text("清單筆數 : ${list.length}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        itemCount: list.length,
-                        separatorBuilder: (context, index) => const Divider(),
-                        itemBuilder: (context, index) => ListTile(title: Text(list[index])),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+            child: isLoading 
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                  itemCount: filteredOrders.length,
+                  itemBuilder: (context, index) => _orderCard(filteredOrders[index]),
+                ),
           ),
         ],
       ),
     );
   }
 
-  Widget _customTab(String title, bool active, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.45,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: active ? Colors.green : Colors.grey[300],
-          borderRadius: BorderRadius.circular(4),
+  Widget _buildTabs() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        TextButton(onPressed: () => setState(() => isTodayOnly = true), child: Text("今日", style: TextStyle(color: isTodayOnly ? Colors.blue : Colors.grey))),
+        TextButton(onPressed: () => setState(() => isTodayOnly = false), child: Text("全部", style: TextStyle(color: !isTodayOnly ? Colors.blue : Colors.grey))),
+      ],
+    );
+  }
+
+  Widget _orderCard(Map<String, dynamic> order) {
+    int total = order['totalPrice'] ?? 0;
+    int finalPrice = total >= 100 ? (total * 0.9).round() : total;
+
+    return Card(
+      margin: const EdgeInsets.all(10),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("客戶: ${order['customerName']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text("時間: ${order['orderTime']}"),
+            Text("內容: ${order['items']}"),
+            const Divider(),
+            Text("總計: $total / 優惠: $finalPrice", style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ],
         ),
-        alignment: Alignment.center,
-        child: Text(title, style: TextStyle(color: active ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
       ),
     );
   }
