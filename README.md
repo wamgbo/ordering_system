@@ -1,35 +1,37 @@
-🍽️ Ordering System
+# 🍽️ Ordering System
 
-一個使用 Flutter 開發的跨平台點餐系統專案，支援 Android、iOS 與 Web。
+一個使用 **Flutter** 開發的跨平台點餐系統專案，支援 Android、iOS 與 Web。  
 此專案可作為課程專題、系統雛型或後續串接後端（如 Firebase / REST API）的基礎架構。
 
-📌 專案簡介
+---
 
-Ordering System 是一套以 Flutter 為核心的前端點餐應用，設計目標為：
+## 📌 專案簡介
 
-快速建立點餐流程 UI
+**Ordering System** 是一套以 Flutter 為核心的前端點餐應用，設計目標為：
 
-提供清楚的程式結構，方便擴充
+- 快速建立點餐流程 UI
+- 提供清楚的程式結構，方便擴充
+- 作為實務專案或學習 Flutter 架構的範例
 
-作為實務專案或學習 Flutter 架構的範例
+---
 
-✨ 功能概覽
+## ✨ 功能概覽
 
 目前專案包含以下功能與設計重點：
 
-📱 Flutter 跨平台支援（Android / iOS / Web）
+- 📱 Flutter 跨平台支援（Android / iOS / Web）
+- 🧭 基本頁面導覽（Navigator）
+- 🧱 模組化 UI 元件設計
+- 📦 清楚的資料模型結構
+- 🛠️ 易於擴充後端服務（Firebase / API）
 
-🧭 基本頁面導覽（Navigator）
+> 本專案著重於「前端架構與流程設計」，後端可依需求自行串接。
 
-🧱 模組化 UI 元件設計
+---
 
-📦 清楚的資料模型結構
+## 🗂️ 專案結構
 
-🛠️ 易於擴充後端服務（Firebase / API）
-
-本專案著重於「前端架構與流程設計」，後端可依需求自行串接。
-
-🗂️ 專案結構
+```text
 ordering_system/
 ├── android/                 # Android 原生設定
 ├── ios/                     # iOS 原生設定
@@ -42,86 +44,113 @@ ordering_system/
 ├── test/                    # 測試程式
 ├── pubspec.yaml             # 套件與專案設定
 └── README.md
+```
 
-🚀 開發環境需求
+---
 
-Flutter SDK（建議使用最新穩定版）
+## 🚀 開發環境需求
 
-Dart SDK（隨 Flutter 附帶）
+- Flutter SDK（建議使用最新穩定版）
+- Dart SDK（隨 Flutter 附帶）
+- Android Studio 或 VS Code
+- Android Emulator 或實體裝置  
+- iOS 需 macOS + Xcode
 
-Android Studio / VS Code
+---
 
-Android Emulator 或實體裝置
--（iOS 需 macOS + Xcode）
+## ▶️ 執行專案
 
-▶️ 執行專案
-1️⃣ 下載專案
+### 1️⃣ 下載專案
+
+```bash
 git clone https://github.com/wamgbo/ordering_system.git
 cd ordering_system
+```
 
-2️⃣ 安裝套件
+### 2️⃣ 安裝套件
+
+```bash
 flutter pub get
+```
 
-3️⃣ 執行應用程式
+### 3️⃣ 執行應用程式
+
+```bash
 flutter run
-
+```
 
 指定平台執行：
 
-Android
+- Android
+  ```bash
+  flutter run -d android
+  ```
 
-flutter run -d android
+- iOS
+  ```bash
+  flutter run -d ios
+  ```
 
+- Web
+  ```bash
+  flutter run -d chrome
+  ```
 
-iOS
+---
 
-flutter run -d ios
+## 📦 建置 Release 版本
 
+### Android
 
-Web
-
-flutter run -d chrome
-
-📦 建置 Release 版本
-Android
+```bash
 flutter build apk --release
-
+```
 
 或（上架 Play Store）
 
+```bash
 flutter build appbundle --release
+```
 
-iOS
+### iOS
+
+```bash
 flutter build ios --release
+```
 
+> 上架前請完成簽章、憑證與 Firebase（若有）設定。
 
-上架前請完成憑證、簽章與 Firebase（若有）設定。
+---
 
-🧪 測試
+## 🧪 測試
 
 執行 Flutter 單元測試：
 
+```bash
 flutter test
+```
 
-🔧 可擴充方向（建議）
+---
 
-🔐 使用者登入（Firebase Auth）
+## 🔧 可擴充方向（建議）
 
-☁️ 雲端資料庫（Firestore / Realtime Database）
+- 🔐 使用者登入（Firebase Auth）
+- ☁️ 雲端資料庫（Firestore / Realtime Database）
+- 🧾 訂單紀錄與歷史查詢
+- 🛎️ 即時訂單狀態更新
+- 💳 金流整合（教學用途）
 
-🧾 訂單記錄與歷史查詢
+---
 
-🛎️ 即時訂單狀態更新
+## 📄 授權條款
 
-💳 金流整合（僅作教學用途）
-
-📄 授權條款
-
-本專案採用 MIT License
+本專案採用 **MIT License**  
 可自由使用、修改與散佈。
 
-🙋‍♂️ 作者
+---
 
-GitHub：@wamgbo
+## 🙋‍♂️ 作者
 
-如有建議或問題，歡迎提出 Issue 或 Pull Request。
+GitHub：[@wamgbo](https://github.com/wamgbo)
+
+如有問題或建議，歡迎提出 Issue 或 Pull Request。
